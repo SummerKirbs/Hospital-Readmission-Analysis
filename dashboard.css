@@ -1,0 +1,219 @@
+body {
+  background: #eef4f7;
+}
+
+.navbar {
+  border-radius: 0;
+}
+
+.section.level1 > h2 {
+  color: #0b5560;
+  font-weight: 700;
+}
+
+.hero {
+  background: linear-gradient(135deg, #0f7b8a 0%, #0b5560 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 22px 28px;
+  margin: 8px 6px 12px 6px;
+}
+
+.hero h2 {
+  margin: 6px 0 8px 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hero p {
+  margin: 0;
+  max-width: 920px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #dff1f3;
+}
+
+.hero-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ed6dd;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 6px 2px 6px;
+}
+
+.kpi {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px 18px;
+  border-left: 5px solid #0f7b8a;
+  box-shadow: 0 2px 6px rgba(11, 85, 96, 0.08);
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0b5560;
+  line-height: 1.1;
+}
+
+.kpi-label {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #5a6b70;
+}
+
+/* Flexdashboard turns a trailing blockquote into the card's notes area. */
+.chart-notes {
+  background: transparent;
+  border-top: none;
+  color: #0f6b78;
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: center;
+  padding: 2px 26px 16px 26px;
+}
+
+.chart-notes strong {
+  color: #0b5560;
+  font-weight: 700;
+}
+
+.chart-notes em {
+  color: #0b5560;
+}
+
+.chart-notes a {
+  color: #0b5560;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.chart-stage {
+  background: #f8fbfd;
+  border-radius: 10px;
+}
+
+.notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+  padding: 8px 6px 24px 6px;
+}
+
+.notes .note-block:last-child {
+  grid-column: 1 / -1;
+}
+
+.note-block {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 6px rgba(11, 85, 96, 0.07);
+}
+
+.note-block h4 {
+  margin: 0 0 8px 0;
+  color: #0b5560;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.note-block p,
+.note-block li {
+  color: #4a5b60;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.note-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.note-block li {
+  margin-bottom: 3px;
+}
+
+code {
+  color: #0b5560;
+  background: #eef4f7;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Keep the reading column comfortable on very wide monitors. */
+.dashboard-page-wrapper {
+  width: 100%;
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Let image charts scale with the card width instead of a fixed pixel height. */
+.chart-wrapper-flex {
+  flex: 0 0 auto !important;
+  height: auto !important;
+}
+
+.chart-wrapper-flex .chart-stage-flex {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.chart-wrapper-flex .chart-shim {
+  position: static !important;
+  height: auto !important;
+}
+
+.chart-wrapper-flex .image-container {
+  position: relative !important;
+  inset: auto !important;
+  height: auto !important;
+  aspect-ratio: 2 / 1;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin: 0 !important;
+}
+
+/* The same plot is painted as a background, so the hidden image must not
+   contribute its intrinsic width to the card layout. */
+.chart-wrapper-flex .image-container img {
+  display: none;
+}
+
+/* Column labels are redundant with the chart titles. */
+.section.level2 > h2 {
+  display: none;
+}
+
+.section.level2 {
+  margin-top: 0;
+}
+
+@media (max-width: 720px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 460px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

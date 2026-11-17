@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journey Escalation Analysis | DataFest 2026</title>
+  <meta name="description" content="Social burden, readmission, and care-gap escalation in a real hospital dataset. An interactive-looking, static dashboard built from reproducible R analysis.">
+  <link rel="canonical" href="https://summerkirbs.github.io/Hospital-Readmission-Analysis/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Journey Escalation Analysis | DataFest 2026">
+  <meta property="og:description" content="Social barriers compound hospital use. Care gaps predict crisis. Two linked analyses from a real hospital dataset.">
+  <meta property="og:url" content="https://summerkirbs.github.io/Hospital-Readmission-Analysis/">
+  <meta property="og:image" content="https://summerkirbs.github.io/Hospital-Readmission-Analysis/assets/img/admissions-by-score.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b5560'/%3E%3Cpath d='M22 70 L42 45 L58 58 L79 28' stroke='%23f5b324' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top" aria-label="Journey Escalation Analysis, back to top">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M3 25 L12 14 L18 19 L29 5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="29" cy="5" r="2.6" fill="currentColor"/>
+        </svg>
+        <span>Journey Escalation<small>DataFest 2026</small></span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#social-burden">Social burden</a>
+        <a href="#care-gaps">Care gaps</a>
+        <a href="#methods">Methods</a>
+        <a class="nav-code" href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis" target="_blank" rel="noopener">Code&nbsp;&nearr;</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow eyebrow-light">DataFest 2026 &middot; Team Databased</p>
+          <h1>Social barriers compound hospital use. Care gaps predict crisis.</h1>
+          <p class="lede">Two linked analyses from a real hospital dataset. One follows social risk into readmission and follow-up. The other follows missed care into ED visits and hospital admissions.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#social-burden">Explore the findings</a>
+            <a class="btn btn-ghost" href="#methods">How it was built</a>
+          </div>
+        </div>
+        <aside class="hero-card" aria-label="Headline finding">
+          <p class="hero-card-label">Social Burden Score &middot; 0 &rarr; 7</p>
+          <p class="hero-stat"><span>0.40</span><span class="hero-arrow" aria-hidden="true">&rarr;</span><span>3.39</span></p>
+          <p class="hero-card-copy">average inpatient admissions per patient</p>
+          <div class="hero-mini">
+            <div><strong>8.5&times;</strong><span>rise across the score</span></div>
+            <div><strong>&minus;16&nbsp;pp</strong><span>follow-up at score 7</span></div>
+          </div>
+          <p class="hero-foot">N = 70,791 patients with a usable SDOH survey</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="chapter" id="social-burden">
+      <div class="wrap">
+        <header class="chapter-head">
+          <p class="eyebrow">Act I &middot; Social burden</p>
+          <h2>Barriers compound. They do not just add up.</h2>
+          <p class="lede">The Social Burden Score counts how many of nine social risk domains a patient screens positive for. As the score rises, inpatient use climbs and timely follow-up falls.</p>
+        </header>
+
+        <div class="kpi-grid">
+          <div class="kpi">
+            <p class="kpi-value">70,791</p>
+            <p class="kpi-label">patients with a usable SDOH survey</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">0.59</p>
+            <p class="kpi-label">average inpatient admissions per patient</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">60%</p>
+            <p class="kpi-label">return for outpatient follow-up within 90 days</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">1.8%</p>
+            <p class="kpi-label">of inpatients have 6+ admissions</p>
+          </div>
+        </div>
+
+        <div class="figure-stack">
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/domain-prevalence.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/domain-prevalence.png" alt="Horizontal bar chart of social burden domain prevalence: high stress 38.7 percent, physical inactivity 34.5 percent, depression screen positive 23.4 percent, financial strain 14.6 percent, heavy alcohol use 14.3 percent, food insecurity 10.0 percent, transportation barrier 5.1 percent, utility shut-off risk 4.2 percent, and housing instability 4.0 percent." width="1920" height="960" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">01</span>Stress and inactivity are the most common barriers. Housing and utility risk are the rarest.</p>
+              <p class="how"><strong>How to read it.</strong> Each bar is the share of patients screened for that domain who screen positive. Every domain has its own denominator and defined threshold, so read each bar within its own screened group.</p>
+              <div class="chip-row">
+                <span class="chip">38.7% high stress</span>
+                <span class="chip">34.5% physically inactive</span>
+                <span class="chip">4.0% housing instability</span>
+              </div>
+              <p class="meta"><span>Denominators vary by domain</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a></span><span><a href="assets/img/domain-prevalence.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/admissions-by-score.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/admissions-by-score.png" alt="Line and area chart of average inpatient admissions by social burden score: 0.40 at score 0, 0.60 at score 1, 0.75 at score 2, 0.95 at score 3, 1.07 at score 4, 1.46 at score 5, 2.16 at score 6, and 3.39 at score 7." width="1920" height="960" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">02</span>Every additional barrier travels with more inpatient use.</p>
+              <p class="how"><strong>How to read it.</strong> Points are the average number of distinct inpatient stays per patient in each score group. The line rises from <strong>0.40</strong> at score 0 to <strong>3.39</strong> at score 7, roughly an <strong>8.5&times;</strong> increase.</p>
+              <div class="chip-row">
+                <span class="chip">+2.99 admissions</span>
+                <span class="chip">8.5&times; across the score</span>
+                <span class="chip">n=335 at score 7</span>
+              </div>
+              <p class="meta"><span>N = 70,791 patients</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a></span><span><a href="assets/img/admissions-by-score.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/followup-by-score.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/followup-by-score.png" alt="Line and area chart of 90-day follow-up rates by social burden score: 58 percent at score 0, 60 percent at score 1, 62 percent at score 2, 64 percent at score 3, 65 percent at score 4, 61 percent at score 5, 56 percent at score 6, and 41 percent at score 7." width="1920" height="960" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">03</span>Follow-up peaks in the middle, then falls sharply for the highest-burden patients.</p>
+              <p class="how"><strong>How to read it.</strong> The chart shows the share of patients with a face-to-face outpatient visit within 90 days of their first outpatient visit. Follow-up rises to <strong>65%</strong> at score 4, then drops to <strong>41%</strong> at score 7, a <strong>16-point</strong> gap versus score 0. The score-7 group is small (n=335), so treat the final drop as directional.</p>
+              <div class="chip-row">
+                <span class="chip">65% peak at score 4</span>
+                <span class="chip">41% at score 7</span>
+                <span class="chip">&minus;16 pp vs score 0</span>
+              </div>
+              <p class="meta"><span>N = 70,791 patients</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a></span><span><a href="assets/img/followup-by-score.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/sdoh-by-readmission.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/sdoh-by-readmission.png" alt="Three faceted bar charts comparing no risk factors, financial strain, and transportation barriers across 1-2, 3-5, and 6+ inpatient admissions. The no-risk share falls from 75.14 percent to 57.32 percent, financial strain rises from 16.95 percent to 31.61 percent, and transportation barriers rise from 6.82 percent to 25.16 percent." width="1920" height="960" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">04</span>The no-risk share falls as readmissions rise. Financial and transportation barriers rise.</p>
+              <p class="how"><strong>How to read it.</strong> Each panel shows the share of screened patients with that factor within each admission band. Panels use different y-axis scales. From 1&ndash;2 to 6+ admissions, the no-risk share falls <strong>17.8 points</strong>, while financial strain and transportation barriers rise by <strong>14.7</strong> and <strong>18.3 points</strong>.</p>
+              <div class="chip-row">
+                <span class="chip">&minus;17.8 pp no risk</span>
+                <span class="chip">+14.7 pp financial strain</span>
+                <span class="chip">+18.3 pp transportation</span>
+              </div>
+              <p class="meta"><span>Screened patients only</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a></span><span><a href="assets/img/sdoh-by-readmission.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/smoking-by-readmission.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/smoking-by-readmission.png" alt="Four faceted bar charts of smoking status across 1-2, 3-5, and 6+ inpatient admissions. Heavy smokers rise from 14.15 to 18.11 percent, light smokers from 2.74 to 3.62 percent, former smokers from 26.17 to 44.74 percent, and never-smokers fall from 56.94 to 33.53 percent." width="1920" height="960" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">05</span>Never-smokers fall from 56.9% to 33.5% as admissions rise. Former smokers rise from 26.2% to 44.7%.</p>
+              <p class="how"><strong>How to read it.</strong> Each panel shows the share of patients in a smoking group within each admission band, excluding unknown smoking status. Heavy and light smokers also grow, but from a smaller base.</p>
+              <div class="chip-row">
+                <span class="chip">&minus;23.4 pp never-smokers</span>
+                <span class="chip">+18.6 pp former smokers</span>
+              </div>
+              <p class="meta"><span>Inpatients with known smoking status</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a></span><span><a href="assets/img/smoking-by-readmission.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+        </div>
+
+        <aside class="note">
+          <h3>Reading the score</h3>
+          <p>The score counts nine domains: food insecurity, transportation, housing instability, financial strain, utility shut-off risk, high stress, a positive depression screen, heavy alcohol use, and physical inactivity. A patient enters the score only if they answered at least one domain. Missing domains add zero, so the score is a lower bound on burden.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="chapter chapter--tint chapter--gaps" id="care-gaps">
+      <div class="wrap">
+        <header class="chapter-head">
+          <p class="eyebrow">Act II &middot; Care gaps</p>
+          <h2>When follow-up stops, escalation starts.</h2>
+          <p class="lede">The second analysis follows every care transition after a chronic-condition outpatient visit. Escalation means the next contact is an ED visit, hospital admission, or inpatient stay, not another routine visit.</p>
+        </header>
+
+        <div class="kpi-grid">
+          <div class="kpi">
+            <p class="kpi-value">90,836</p>
+            <p class="kpi-label">chronic-condition patients in the cohort</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">262,585</p>
+            <p class="kpi-label">outpatient-to-next-contact transitions</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">5.0%</p>
+            <p class="kpi-label">of transitions escalate to ED or hospital</p>
+          </div>
+          <div class="kpi">
+            <p class="kpi-value">14.6%</p>
+            <p class="kpi-label">of patients ever escalate</p>
+          </div>
+        </div>
+
+        <div class="figure-stack">
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/escalation-by-gap.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/escalation-by-gap.png" alt="Bar chart of escalation rate by days to the next care contact. Rates are 5.8 percent at 1-30 days, 4.9 percent at 31-60, 4.4 percent at 61-90, 2.8 percent at 91-120, 4.1 percent at 121-180, 2.5 percent at 181-270, 4.6 percent at 271-365, and 8.1 percent at 365-plus days." width="2334" height="1425" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">06</span>Escalation is U-shaped: highest in the first month and after a year.</p>
+              <p class="how"><strong>How to read it.</strong> Each bar is the share of outpatient chronic-care anchors whose next care contact is an ED visit, hospital admission, or inpatient stay. Bars show 95% confidence intervals. Short gaps likely mix acute deterioration with routine follow-up; very long gaps are more consistent with disengagement.</p>
+              <div class="chip-row">
+                <span class="chip">5.8% at 1&ndash;30 days</span>
+                <span class="chip">2.5&ndash;2.8% at 6&ndash;9 months</span>
+                <span class="chip">8.1% at 365+ days</span>
+              </div>
+              <details>
+                <summary>See the full gap table</summary>
+                <div class="table-wrap">
+                  <table>
+                    <caption>Escalation rate by time to the next care contact</caption>
+                    <thead><tr><th scope="col">Gap (days)</th><th scope="col">Transitions</th><th scope="col">Escalations</th><th scope="col">Rate</th></tr></thead>
+                    <tbody>
+                      <tr><td>1&ndash;30</td><td>128,103</td><td>7,454</td><td>5.8%</td></tr>
+                      <tr><td>31&ndash;60</td><td>45,105</td><td>2,212</td><td>4.9%</td></tr>
+                      <tr><td>61&ndash;90</td><td>24,767</td><td>1,099</td><td>4.4%</td></tr>
+                      <tr><td>91&ndash;120</td><td>23,065</td><td>643</td><td>2.8%</td></tr>
+                      <tr><td>121&ndash;180</td><td>17,898</td><td>730</td><td>4.1%</td></tr>
+                      <tr><td>181&ndash;270</td><td>16,473</td><td>417</td><td>2.5%</td></tr>
+                      <tr><td>271&ndash;365</td><td>3,461</td><td>159</td><td>4.6%</td></tr>
+                      <tr><td>365+</td><td>3,713</td><td>300</td><td>8.1%</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+              <p class="meta"><span>N = 262,585 transitions</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/agentic_datafest_patients.Rmd" target="_blank" rel="noopener">agentic_datafest_patients.Rmd</a></span><span><a href="assets/img/escalation-by-gap.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/escalation-odds-ratios.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/escalation-odds-ratios.png" alt="Forest plot of adjusted odds ratios. Unstable housing 2.76, transportation barrier 2.09, outpatient visits per five 1.76, current smoker 1.51, chronic condition count 1.49, racial minority 1.44, food insecure 1.29, financial strain 1.23. High stress and depression are not significant. MyChart activation 0.69, age 40-64 0.67, and age 65-plus 0.63 are associated with lower odds." width="2322" height="1425" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">07</span>Housing instability and transportation barriers are the strongest adjusted signals.</p>
+              <p class="how"><strong>How to read it.</strong> Odds ratios come from a patient-level logistic model. Values above 1 mean higher odds of ever escalating; values below 1 mean lower odds. Each social factor is added separately, so N varies by row. MyChart activation and older age are associated with lower odds.</p>
+              <div class="chip-row">
+                <span class="chip">Unstable housing 2.76</span>
+                <span class="chip">Transportation 2.09</span>
+                <span class="chip">MyChart 0.69</span>
+              </div>
+              <details>
+                <summary>See exact odds ratios</summary>
+                <div class="table-wrap">
+                  <table>
+                    <caption>Adjusted odds of ever escalating (base model N = 62,014)</caption>
+                    <thead><tr><th scope="col">Predictor</th><th scope="col">OR</th><th scope="col">95% CI</th><th scope="col">p</th><th scope="col">N</th></tr></thead>
+                    <tbody>
+                      <tr><td>Unstable housing</td><td>2.76</td><td>2.01&ndash;3.80</td><td>&lt;0.001</td><td>13,314</td></tr>
+                      <tr><td>Transportation barrier</td><td>2.09</td><td>1.75&ndash;2.49</td><td>&lt;0.001</td><td>18,682</td></tr>
+                      <tr><td>Outpatient visits (per 5)</td><td>1.76</td><td>1.72&ndash;1.81</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Current smoker</td><td>1.51</td><td>1.42&ndash;1.62</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Chronic conditions (count)</td><td>1.49</td><td>1.45&ndash;1.54</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Racial minority</td><td>1.44</td><td>1.36&ndash;1.53</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Food insecure</td><td>1.29</td><td>1.13&ndash;1.48</td><td>&lt;0.001</td><td>18,474</td></tr>
+                      <tr><td>Financial strain</td><td>1.23</td><td>1.09&ndash;1.38</td><td>&lt;0.001</td><td>16,020</td></tr>
+                      <tr><td>High stress</td><td>1.03</td><td>0.94&ndash;1.12</td><td>0.527</td><td>18,144</td></tr>
+                      <tr><td>Depression screen positive</td><td>0.80</td><td>0.50&ndash;1.26</td><td>0.353</td><td>767</td></tr>
+                      <tr><td>MyChart activated</td><td>0.69</td><td>0.64&ndash;0.73</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Age 40&ndash;64 (vs under 40)</td><td>0.67</td><td>0.61&ndash;0.72</td><td>&lt;0.001</td><td>62,014</td></tr>
+                      <tr><td>Age 65+ (vs under 40)</td><td>0.63</td><td>0.58&ndash;0.68</td><td>&lt;0.001</td><td>62,014</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+              <p class="meta"><span>Base model N = 62,014</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/agentic_datafest_patients.Rmd" target="_blank" rel="noopener">agentic_datafest_patients.Rmd</a></span><span><a href="assets/img/escalation-odds-ratios.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+
+          <figure class="chart-card">
+            <div class="chart-media">
+              <a class="chart-link" href="assets/img/compound-risk.png" target="_blank" rel="noopener" title="Open full-size chart in a new tab"><img src="assets/img/compound-risk.png" alt="Bar chart of escalation by smoking and transportation barriers: 20.6 percent for neither, 27.2 percent for current smoker only, 38.7 percent for transportation barrier only, and 42.9 percent for both." width="2334" height="1493" decoding="async"></a>
+            </div>
+            <figcaption>
+              <p class="takeaway"><span class="fig-num">08</span>Risks compound: smoking plus a transportation barrier reaches 42.9% escalation.</p>
+              <p class="how"><strong>How to read it.</strong> These are observed escalation rates for four groups, not adjusted for other factors. The &ldquo;both&rdquo; group is small (n=198), so treat the exact gap as directional; the ordering is the useful signal.</p>
+              <div class="chip-row">
+                <span class="chip">20.6% neither</span>
+                <span class="chip">27.2% smoking only</span>
+                <span class="chip">38.7% transportation only</span>
+                <span class="chip">42.9% both</span>
+              </div>
+              <details>
+                <summary>See the group counts</summary>
+                <div class="table-wrap">
+                  <table>
+                    <caption>Escalation by smoking and transportation barriers</caption>
+                    <thead><tr><th scope="col">Group</th><th scope="col">Patients</th><th scope="col">Escalated</th><th scope="col">Rate</th></tr></thead>
+                    <tbody>
+                      <tr><td>Neither</td><td>16,070</td><td>3,318</td><td>20.6%</td></tr>
+                      <tr><td>Current smoker only</td><td>2,055</td><td>559</td><td>27.2%</td></tr>
+                      <tr><td>Transportation barrier only</td><td>457</td><td>177</td><td>38.7%</td></tr>
+                      <tr><td>Both</td><td>198</td><td>85</td><td>42.9%</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+              <p class="meta"><span>Patients with both fields answered</span><span>Code: <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/agentic_datafest_patients.Rmd" target="_blank" rel="noopener">agentic_datafest_patients.Rmd</a></span><span><a href="assets/img/compound-risk.png" target="_blank" rel="noopener">Full-size chart</a></span></p>
+            </figcaption>
+          </figure>
+        </div>
+
+        <aside class="note">
+          <h3>Two rates, two questions</h3>
+          <p><strong>5.0%</strong> is the share of care transitions that escalate. A single patient can contribute several transitions, so this is not a patient risk. <strong>14.6%</strong> is the share of patients who ever escalate. Use the first for the system view, the second for the patient view.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="chapter" id="methods">
+      <div class="wrap">
+        <header class="chapter-head">
+          <p class="eyebrow">Methods</p>
+          <h2>What the numbers mean.</h2>
+          <p class="lede">Definitions, data limits, and the code that produces every chart on this page.</p>
+        </header>
+
+        <div class="methods-grid">
+          <article class="method-card">
+            <h3>Data</h3>
+            <p>The dataset is private outside of the hackathon and is not included in this repository. It spans multiple CSVs and hundreds of features across millions of rows; only the fields used in this analysis were selected and compiled into working tables.</p>
+            <p>No patient-level records are published. Everything on this page is aggregated. The analysis expects the source files in a local <code>DATA/</code> folder.</p>
+          </article>
+
+          <article class="method-card">
+            <h3>Social Burden Score</h3>
+            <p>One point per positive domain, across nine domains. A patient enters the score only if they answered at least one domain; missing domains add zero.</p>
+            <ul>
+              <li><strong>Food:</strong> &ldquo;sometimes&rdquo; or &ldquo;often&rdquo; true on either food question.</li>
+              <li><strong>Transportation:</strong> &ldquo;yes&rdquo; to either transportation question.</li>
+              <li><strong>Housing:</strong> homeless, no steady place to sleep in the past year, or 3+ moves.</li>
+              <li><strong>Financial:</strong> paying for basics is somewhat hard, hard, or very hard, or unable to pay rent on time.</li>
+              <li><strong>Utilities:</strong> threatened shut-off or already shut off.</li>
+              <li><strong>Stress:</strong> &ldquo;rather much&rdquo; or &ldquo;very much.&rdquo;</li>
+              <li><strong>Depression:</strong> Edinburgh &ge; 10 or PHQ-2 &ge; 3.</li>
+              <li><strong>Alcohol:</strong> drinking 2&ndash;3 times a week or more, or weekly binge drinking.</li>
+              <li><strong>Inactivity:</strong> zero days of moderate exercise per week.</li>
+            </ul>
+          </article>
+
+          <article class="method-card">
+            <h3>Readmission and follow-up</h3>
+            <p>An inpatient admission is a distinct inpatient stay; consecutive inpatient days count once. Readmission bands are 1&ndash;2, 3&ndash;5, and 6+ stays.</p>
+            <p>Follow-up means a face-to-face outpatient visit within 90 days of the patient&rsquo;s first outpatient visit. The score is cross-sectional: it uses the most recent positive answer available, not a time-varying exposure.</p>
+          </article>
+
+          <article class="method-card">
+            <h3>Care-gap escalation</h3>
+            <p>An anchor is a face-to-face outpatient visit coded to a chronic condition. Escalation is the next care contact after the anchor being an ED visit, hospital admission, or inpatient stay. Lab and imaging days are ignored so they do not reset the follow-up clock.</p>
+            <p>The gap is days from the anchor to that next contact. Same-day contacts are excluded.</p>
+          </article>
+
+          <article class="method-card">
+            <h3>Model</h3>
+            <p>The patient-level outcome is whether a patient ever escalated. A logistic regression adjusts for smoking, MyChart activation, race, age, condition count, and visit count. Each social factor is added separately, so the reported N varies by row.</p>
+            <p>Odds ratios are descriptive. Visit count doubles as observation time, so it is not a causal estimate. The compound-risk chart is unadjusted by design.</p>
+          </article>
+
+          <article class="method-card">
+            <h3>Reproducibility</h3>
+            <p>Every figure is written by the R Markdown code in this repository. Running the analysis with the private source data regenerates the PNGs in <code>assets/img/</code>.</p>
+            <ul class="code-list">
+              <li><a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/social_burden_dashboard.Rmd" target="_blank" rel="noopener">social_burden_dashboard.Rmd</a> (Act I figures)</li>
+              <li><a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/dashboard_data.R" target="_blank" rel="noopener">dashboard_data.R</a> (cohort and SDOH tables)</li>
+              <li><a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/agentic_datafest_patients.Rmd" target="_blank" rel="noopener">agentic_datafest_patients.Rmd</a> (Act II figures)</li>
+              <li><a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis/blob/main/scripts/rebuild_site_figures.R" target="_blank" rel="noopener">scripts/rebuild_site_figures.R</a> (rebuild the site assets)</li>
+            </ul>
+          </article>
+
+          <article class="method-card method-card-wide">
+            <h3>Limitations</h3>
+            <ul>
+              <li>The social score is cross-sectional and based on questionnaire coverage; it is not a time-varying exposure.</li>
+              <li>The highest score group is small (n=335), so the final follow-up drop is directional.</li>
+              <li>The &ldquo;both risk factors&rdquo; group in the compound chart is small (n=198).</li>
+              <li>Odds ratios are adjusted associations, not causal effects. Unmeasured confounding remains.</li>
+              <li>The original hackathon deck used a looser questionnaire denominator; this page uses the stricter, patient-level cohort described above.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <a href="https://github.com/SummerKirbs/Hospital-Readmission-Analysis" target="_blank" rel="noopener">GitHub repository&nbsp;&nearr;</a>
+    </div>
+  </footer>
+
+  <script>
+    // Highlight the section currently in view. Content works without JS.
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('nav a[href^="#"]'));
+      if (!links.length || !('IntersectionObserver' in window)) return;
+      var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          links.forEach(function (link) { link.removeAttribute('aria-current'); });
+          var active = links.filter(function (link) { return link.getAttribute('href') === '#' + entry.target.id; })[0];
+          if (active) active.setAttribute('aria-current', 'location');
+        });
+      }, { rootMargin: '-25% 0px -60% 0px' });
+      targets.forEach(function (target) { observer.observe(target); });
+    }());
+  </script>
+</body>
+</html>

@@ -1,0 +1,429 @@
+---
+title: "Journey Escalation Analysis"
+subtitle: "Social burden, follow-up, and readmission frequency"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    source_code: embed
+    theme:
+      version: 5
+      bootswatch: flatly
+    css: dashboard.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, message = FALSE, warning = FALSE,
+  fig.width = 10, fig.height = 5
+)
+
+library(flexdashboard)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(scales)
+
+doc_dir <- tryCatch({
+  input <- knitr::current_input(dir = TRUE)
+  if (is.null(input)) getwd() else dirname(input)
+}, error = function(e) getwd())
+doc_dir <- normalizePath(doc_dir, winslash = "/", mustWork = TRUE)
+
+source(file.path(doc_dir, "dashboard_data.R"))
+dash <- load_dashboard_data(doc_dir)
+patients <- dash$patients
+
+# Save each chart for the static GitHub Pages site.
+site_img <- function(name) {
+  dir.create(file.path(doc_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
+  file.path(doc_dir, "assets", "img", name)
+}
+
+sbs <- patients %>%
+  filter(screened_any == 1) %>%
+  mutate(score = pmin(social_burden, 7L))
+
+sbs_summary <- sbs %>%
+  group_by(score) %>%
+  summarise(
+    n = n(),
+    mean_stays = mean(n_stays),
+    follow_up = mean(ret90_out),
+    .groups = "drop"
+  )
+
+adm0 <- sbs_summary$mean_stays[sbs_summary$score == 0]
+adm7 <- sbs_summary$mean_stays[sbs_summary$score == 7]
+adm_delta <- adm7 - adm0
+adm_ratio <- adm7 / adm0
+
+fu0 <- sbs_summary$follow_up[sbs_summary$score == 0]
+fu7 <- sbs_summary$follow_up[sbs_summary$score == 7]
+fu_delta <- 100 * (fu0 - fu7)
+
+readmit <- patients %>%
+  filter(n_stays >= 1) %>%
+  mutate(
+    readmit_bin = factor(
+      case_when(n_stays <= 2 ~ "1-2", n_stays <= 5 ~ "3-5", TRUE ~ "6+"),
+      levels = c("1-2", "3-5", "6+")
+    )
+  )
+
+sdoh_panels <- bind_rows(
+  readmit %>%
+    filter(no_risk_panel_screened == 1) %>%
+    group_by(readmit_bin) %>%
+    summarise(pct = 100 * mean(no_risk_panel), .groups = "drop") %>%
+    mutate(Factor = "No Risk Factors"),
+  readmit %>%
+    filter(pay_basics_screened == 1) %>%
+    group_by(readmit_bin) %>%
+    summarise(pct = 100 * mean(pay_basics_flag), .groups = "drop") %>%
+    mutate(Factor = "Financial Strain"),
+  readmit %>%
+    filter(transport_med_screened == 1) %>%
+    group_by(readmit_bin) %>%
+    summarise(pct = 100 * mean(transport_med_flag), .groups = "drop") %>%
+    mutate(Factor = "Transportation Barrier")
+) %>%
+  mutate(
+    Factor = factor(Factor, levels = c("No Risk Factors", "Financial Strain", "Transportation Barrier"))
+  )
+
+smoke_panels <- readmit %>%
+  filter(!is.na(smoking_group)) %>%
+  count(readmit_bin, smoking_group) %>%
+  group_by(readmit_bin) %>%
+  mutate(pct = 100 * n / sum(n)) %>%
+  ungroup() %>%
+  mutate(
+    smoking_group = factor(
+      smoking_group,
+      levels = c("Heavy Smoker", "Light Smoker", "Former Smoker", "Never")
+    )
+  )
+
+panel_wide <- sdoh_panels %>%
+  select(Factor, readmit_bin, pct) %>%
+  pivot_wider(names_from = readmit_bin, values_from = pct)
+
+no_risk_drop <- panel_wide$`1-2`[panel_wide$Factor == "No Risk Factors"] -
+  panel_wide$`6+`[panel_wide$Factor == "No Risk Factors"]
+barrier_rise <- mean(c(
+  panel_wide$`6+`[panel_wide$Factor == "Financial Strain"] -
+    panel_wide$`1-2`[panel_wide$Factor == "Financial Strain"],
+  panel_wide$`6+`[panel_wide$Factor == "Transportation Barrier"] -
+    panel_wide$`1-2`[panel_wide$Factor == "Transportation Barrier"]
+))
+
+domain_labels <- c(
+  food = "Food insecurity",
+  transport = "Transportation barrier",
+  housing = "Housing instability",
+  financial = "Financial strain",
+  utilities = "Utility shut-off risk",
+  stress = "High stress",
+  depression = "Depression screen positive",
+  alcohol = "Heavy alcohol use",
+  inactive = "Physical inactivity"
+)
+
+domain_prevalence <- tibble(
+  domain = names(domain_labels),
+  label = unname(domain_labels)
+) %>%
+  rowwise() %>%
+  mutate(
+    screened = sum(patients[[paste0(domain, "_screened")]] == 1),
+    pct = 100 * mean(patients[[paste0(domain, "_flag")]][patients[[paste0(domain, "_screened")]] == 1])
+  ) %>%
+  ungroup() %>%
+  arrange(pct) %>%
+  mutate(label = factor(label, levels = label))
+
+n_surveyed <- nrow(sbs)
+n_inpatients <- nrow(readmit)
+pct_six_plus <- 100 * mean(readmit$n_stays >= 6)
+mean_stays_surveyed <- mean(sbs$n_stays)
+follow_up_overall <- 100 * mean(sbs$ret90_out)
+
+line_theme <- theme_minimal(base_size = 15) +
+  theme(
+    plot.background = element_rect(fill = "#f8fbfd", color = NA),
+    panel.background = element_rect(fill = "#f8fbfd", color = NA),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 17),
+    plot.subtitle = element_text(color = "grey35", size = 12),
+    axis.title = element_text(color = "grey25"),
+    axis.text = element_text(color = "grey25"),
+    plot.margin = margin(16, 22, 12, 16)
+  )
+
+bar_theme <- theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "#f8fbfd", color = NA),
+    panel.background = element_rect(fill = "#f8fbfd", color = NA),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(color = "grey35", size = 11),
+    strip.background = element_rect(fill = "#eaf2f5", color = NA),
+    strip.text = element_text(face = "bold", size = 11),
+    panel.spacing = unit(1, "lines"),
+    legend.position = "none",
+    plot.margin = margin(14, 16, 10, 14)
+  )
+```
+
+Overview
+=====================================
+
+###
+
+<div class="hero">
+  <div class="hero-kicker">DataFest 2026 · Team Databased</div>
+  <h2>Social burden compounds the risk of hospital escalation</h2>
+  <p>This dashboard rebuilds the five visuals from the presentation on the same encounter and social-determinants data. It follows patients from routine outpatient care into readmission, and asks which social barriers travel with the highest utilization.</p>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-value">`r comma(n_surveyed)`</div><div class="kpi-label">patients with a valid SDOH survey</div></div>
+  <div class="kpi"><div class="kpi-value">`r sprintf("%.2f", mean_stays_surveyed)`</div><div class="kpi-label">average inpatient admissions per patient</div></div>
+  <div class="kpi"><div class="kpi-value">`r sprintf("%.0f%%", follow_up_overall)`</div><div class="kpi-label">return for outpatient follow-up within 90 days</div></div>
+  <div class="kpi"><div class="kpi-value">`r sprintf("%.1f%%", pct_six_plus)`</div><div class="kpi-label">of inpatients have 6+ admissions</div></div>
+</div>
+
+###
+
+```{r}
+p_domain <- ggplot(domain_prevalence, aes(x = pct, y = label)) +
+  geom_col(fill = "#0f7b8a", width = 0.72) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    hjust = -0.15, size = 3.6, fontface = "bold", color = "#0b5560"
+  ) +
+  scale_x_continuous(
+    labels = percent_format(scale = 1),
+    expand = expansion(mult = c(0, 0.22))
+  ) +
+  labs(
+    title = "Prevalence of each social burden domain",
+    subtitle = "Among patients screened for that domain",
+    x = "% positive",
+    y = NULL
+  ) +
+  bar_theme +
+  theme(panel.grid.major.y = element_blank())
+
+print(p_domain)
+ggsave(site_img("domain-prevalence.png"), p_domain,
+       width = 10, height = 5, dpi = 192, bg = "#f8fbfd")
+```
+
+> The Social Burden Score counts the positive domains across nine SDOH domains. A domain counts as positive at the high-risk threshold shown in [Definitions](#definitions), so the score reflects compounding barriers rather than a single bad answer.
+
+Social Burden
+=====================================
+
+###
+
+```{r}
+p_admissions <- ggplot(sbs_summary, aes(x = score, y = mean_stays)) +
+  geom_area(fill = "#f3b8ab", alpha = 0.55) +
+  geom_line(color = "#d95f4b", linewidth = 1.3) +
+  geom_point(color = "#d95f4b", size = 3.2) +
+  geom_text(
+    aes(label = sprintf("%.2f", mean_stays)),
+    vjust = -1.1, size = 4, fontface = "bold", color = "#8c2d1d"
+  ) +
+  geom_text(
+    aes(label = paste0("n=", comma(n))),
+    vjust = 2.4, size = 3.1, color = "grey40"
+  ) +
+  annotate(
+    "segment", x = 7.25, xend = 7.25, y = adm0, yend = adm7,
+    arrow = arrow(length = unit(0.2, "cm"), type = "closed"),
+    color = "#b03a2e", linewidth = 0.8
+  ) +
+  annotate(
+    "text", x = 7.45, y = (adm0 + adm7) / 2,
+    label = sprintf("+%.2f", adm_delta),
+    hjust = 0, color = "#b03a2e", fontface = "bold", size = 4.2
+  ) +
+  scale_x_continuous(
+    breaks = 0:7, labels = paste0("Score ", 0:7),
+    limits = c(-0.2, 8.6)
+  ) +
+  scale_y_continuous(
+    labels = number_format(accuracy = 0.1),
+    expand = expansion(mult = c(0, 0.18))
+  ) +
+  labs(
+    title = "Inpatient Admissions by Social Burden Score",
+    subtitle = "Average inpatient admissions per patient",
+    x = NULL,
+    y = "Avg. inpatient admissions per patient"
+  ) +
+  line_theme +
+  theme(axis.text.x = element_text(size = 10))
+
+print(p_admissions)
+ggsave(site_img("admissions-by-score.png"), p_admissions,
+       width = 10, height = 5, dpi = 192, bg = "#f8fbfd")
+```
+
+> Every additional social burden domain travels with more inpatient use. The average rises from **`r sprintf("%.2f", adm0)`** at score 0 to **`r sprintf("%.2f", adm7)`** at score 7+, roughly a **`r sprintf("%.1f", adm_ratio)`x** increase.
+
+###
+
+```{r}
+p_followup <- ggplot(sbs_summary, aes(x = score, y = 100 * follow_up)) +
+  geom_area(fill = "#b8dde2", alpha = 0.6) +
+  geom_line(color = "#0f7b8a", linewidth = 1.3) +
+  geom_point(color = "#0f7b8a", size = 3.2) +
+  geom_text(
+    aes(label = sprintf("%.0f%%", 100 * follow_up)),
+    vjust = -1.1, size = 4, fontface = "bold", color = "#0b5560"
+  ) +
+  geom_text(
+    aes(label = paste0("n=", comma(n))),
+    vjust = 2.4, size = 3.1, color = "grey40"
+  ) +
+  annotate(
+    "segment", x = 7.25, xend = 7.25, y = 100 * fu7, yend = 100 * fu0,
+    arrow = arrow(length = unit(0.2, "cm"), type = "closed"),
+    color = "#0f7b8a", linewidth = 0.8
+  ) +
+  annotate(
+    "text", x = 7.45, y = 100 * (fu0 + fu7) / 2,
+    label = sprintf("\u2212%.0f pp", fu_delta),
+    hjust = 0, color = "#0b5560", fontface = "bold", size = 4.2
+  ) +
+  scale_x_continuous(
+    breaks = 0:7, labels = paste0("Score ", 0:7),
+    limits = c(-0.2, 8.6)
+  ) +
+  scale_y_continuous(
+    labels = percent_format(scale = 1),
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  labs(
+    title = "Follow-Up Rate by Social Burden Score",
+    subtitle = "Outpatient follow-up within 90 days of the first visit",
+    x = NULL,
+    y = "% of patients who return for follow-up"
+  ) +
+  line_theme +
+  theme(axis.text.x = element_text(size = 10))
+
+print(p_followup)
+ggsave(site_img("followup-by-score.png"), p_followup,
+       width = 10, height = 5, dpi = 192, bg = "#f8fbfd")
+```
+
+> Patients with more social barriers are less likely to return for timely outpatient follow-up: **`r sprintf("%.0f%%", 100 * fu0)`** at score 0 versus **`r sprintf("%.0f%%", 100 * fu7)`** at score 7+, a **`r sprintf("%.0f", fu_delta)`-point** drop. Social burden is not solely correlated with worse outcomes; it compounds them.
+
+Readmission Frequency
+=====================================
+
+###
+
+```{r}
+p_sdoh <- ggplot(sdoh_panels, aes(x = readmit_bin, y = pct, fill = readmit_bin)) +
+  geom_col(width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f%%", pct)),
+    vjust = -0.45, size = 3.4, fontface = "bold", color = "grey25"
+  ) +
+  facet_wrap(~Factor, scales = "free_y", nrow = 1) +
+  scale_fill_manual(values = c("1-2" = "#8ed1fc", "3-5" = "#f5b324", "6+" = "#00838f")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(
+    title = "Social Determinants of Health by Readmission Frequency",
+    subtitle = "Among screened patients only",
+    x = "Number of Inpatient Admissions",
+    y = "% of Patients"
+  ) +
+  bar_theme
+
+print(p_sdoh)
+ggsave(site_img("sdoh-by-readmission.png"), p_sdoh,
+       width = 10, height = 5, dpi = 192, bg = "#f8fbfd")
+```
+
+> While patients with no social barriers drop **`r sprintf("%.1f", no_risk_drop)`** percentage points from 1-2 admissions to 6+ admissions, those with social barriers rise by an average of **`r sprintf("%.1f", barrier_rise)`** points. The pattern is a widening gap, not a level shift.
+
+###
+
+```{r}
+p_smoking <- ggplot(smoke_panels, aes(x = readmit_bin, y = pct, fill = readmit_bin)) +
+  geom_col(width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f%%", pct)),
+    vjust = -0.45, size = 3.0, fontface = "bold", color = "grey25"
+  ) +
+  facet_wrap(~smoking_group, scales = "free_y", nrow = 1) +
+  scale_fill_manual(values = c("1-2" = "#8ed1fc", "3-5" = "#f5b324", "6+" = "#00838f")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.22))) +
+  labs(
+    title = "Smoking Status by Readmission Frequency",
+    subtitle = "Excluding unknown smoking status",
+    x = "Number of Inpatient Admissions",
+    y = "% of Patients"
+  ) +
+  bar_theme
+
+print(p_smoking)
+ggsave(site_img("smoking-by-readmission.png"), p_smoking,
+       width = 10, height = 5, dpi = 192, bg = "#f8fbfd")
+```
+
+> Heavy and former smokers make up a growing share of patients as readmission frequency rises, while never-smokers fall by more than 20 points. Patients who need the most consistent outpatient care are the least likely to receive it and are the most likely to end up hospitalized.
+
+Definitions
+=====================================
+
+### How the dashboard is built
+
+<div class="notes">
+
+<div class="note-block">
+<h4>Social Burden Score</h4>
+<p>Nine domains are counted, one point per positive domain: food insecurity, transportation barriers, housing instability, financial strain, utility shut-off risk, high stress, a positive depression screen, heavy alcohol use, and physical inactivity. Missing domains add zero; a patient enters the score only if they answered at least one domain.</p>
+</div>
+
+<div class="note-block">
+<h4>Domain thresholds</h4>
+<ul>
+<li><strong>Food insecurity:</strong> “Sometimes true” or “Often true” on either food question.</li>
+<li><strong>Transportation:</strong> “Yes” to either transportation question.</li>
+<li><strong>Housing instability:</strong> homeless or without a steady place to sleep in the past year, or three or more moves.</li>
+<li><strong>Financial strain:</strong> paying for basics is somewhat hard, hard, or very hard, or unable to pay rent on time.</li>
+<li><strong>Utility shut-off risk:</strong> threatened shut-off or already shut off.</li>
+<li><strong>High stress:</strong> “Rather much” or “Very much.”</li>
+<li><strong>Depression:</strong> Edinburgh score ≥ 10 or PHQ-2 score ≥ 3.</li>
+<li><strong>Heavy alcohol use:</strong> drinking 2–3 times a week or more, or weekly binge drinking.</li>
+<li><strong>Physical inactivity:</strong> zero days of moderate exercise per week.</li>
+</ul>
+</div>
+
+<div class="note-block">
+<h4>Outcomes</h4>
+<p>An inpatient admission is a distinct inpatient stay; consecutive inpatient days count once. Readmission bins are 1–2, 3–5, and 6+ stays. Follow-up means a face-to-face outpatient visit within 90 days of the patient’s first outpatient visit. The score is cross-sectional: it uses the most recent positive answer available, not a time-varying exposure.</p>
+</div>
+
+<div class="note-block">
+<h4>Coverage</h4>
+<p>The score covers `r comma(n_surveyed)` patients with at least one valid domain response. The readmission panels use the full inpatient population for smoking and the screened subset for each social factor.</p>
+</div>
+
+<div class="note-block">
+<h4>Sources</h4>
+<p>Encounters: <code>encounters.csv</code>. Questionnaires: <code>social_determinants.csv</code>. Demographics and smoking status: <code>patients.csv</code>. The encounter scan is cached in <code>cache/dashboard_data.rds</code>; the first render takes a few minutes, later renders are fast.</p>
+</div>
+
+</div>

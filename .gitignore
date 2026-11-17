@@ -1,0 +1,20 @@
+# Private DataFest data — not published.
+/DATA/
+/data/
+
+# Original hackathon work — kept locally, not published.
+/old_work/
+
+# Generated analysis artifacts.
+/cache/
+/figures/
+/*.rds
+
+# R / editor noise.
+.Rhistory
+.Rproj.user/
+*.Rproj
+.DS_Store
+
+# Local session transcript.
+/session-*.md

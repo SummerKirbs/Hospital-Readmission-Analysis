@@ -1,0 +1,794 @@
+---
+title: "Journey Escalation in Chronic Care"
+subtitle: "DataFest 2026"
+date: "2026-11-15"
+output:
+  pdf_document:
+    fig_caption: false
+    toc: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  out.width = "100%"
+)
+```
+
+## Data
+
+Does dropping out of routine chronic-care follow-up show up later as an ED visit or a hospital admission, and which patients are most likely to make that jump? This rebuilds the journey-escalation analysis on the merged encounter file: 90,836 chronic-condition patients, 262,585 care transitions, and a 5.0% escalation rate.
+
+`full_encounters.csv` is the merged encounter table. `social_determinants.csv` holds the raw questionnaire responses. The wide SDOH fields in the merged file are mostly empty (for example, `UnstableHousing` has one non-missing value), so social risk is built from the raw responses instead.
+
+```{r libraries}
+library(tidyverse)
+library(broom)
+library(DBI)
+library(duckdb)
+```
+
+```{r paths}
+doc_dir <- tryCatch({
+  input <- knitr::current_input(dir = TRUE)
+  if (is.null(input)) getwd() else dirname(input)
+}, error = function(e) getwd())
+doc_dir <- normalizePath(doc_dir, winslash = "/", mustWork = TRUE)
+
+find_data <- function(filename) {
+  candidates <- c(
+    file.path("..", "DATA", filename),
+    file.path("DATA", filename),
+    filename
+  )
+  hit <- candidates[file.exists(candidates)]
+  if (!length(hit)) stop("Could not find ", filename, call. = FALSE)
+  normalizePath(hit[1], winslash = "/")
+}
+
+encounters_csv <- find_data("full_encounters.csv")
+sdoh_csv <- find_data("social_determinants.csv")
+
+cache_dir <- file.path(doc_dir, "cache")
+fig_dir <- file.path(doc_dir, "figures")
+dir.create(cache_dir, showWarnings = FALSE)
+dir.create(fig_dir, showWarnings = FALSE)
+
+# Copy chart output into the static site folder.
+site_img <- function(name) {
+  dir.create(file.path(doc_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
+  file.path(doc_dir, "assets", "img", name)
+}
+```
+
+## Cohort and cache
+
+The merged file is 3.6 GB, so it is scanned once and reduced to encounters belonging to patients with at least one chronic-condition diagnosis. The cache is rebuilt when the source file changes.
+
+```{r load-encounters}
+chronic_names <- c(
+  "Essential",                               # I10 is stored under this label
+  "Type 1 diabetes mellitus",
+  "Type 2 diabetes mellitus",
+  "Heart failure",
+  "Other chronic obstructive pulmonary disease",
+  "Asthma",
+  "Major depressive disorder, recurrent",
+  "Major depressive disorder, single episode",
+  "Chronic kidney disease"
+)
+
+encounter_cache <- file.path(cache_dir, "patient_encounters.rds")
+
+load_encounters <- function() {
+  if (file.exists(encounter_cache) &&
+      file.mtime(encounter_cache) >= file.mtime(encounters_csv)) {
+    cached <- tryCatch(readRDS(encounter_cache), error = function(e) NULL)
+    if (!is.null(cached)) return(cached)
+  }
+
+  if (!requireNamespace("duckdb", quietly = TRUE)) {
+    stop("Install duckdb to build the encounter cache.", call. = FALSE)
+  }
+
+  con <- dbConnect(duckdb::duckdb())
+  on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
+
+  name_sql <- paste(sprintf("'%s'", chronic_names), collapse = ", ")
+
+  dbExecute(con, sprintf("
+    CREATE TEMP TABLE enc AS
+    SELECT
+      TRY_CAST(PatientDurableKey AS INTEGER) AS PatientDurableKey,
+      TRY_CAST(EncounterKey AS INTEGER) AS EncounterKey,
+      TRY_CAST(strptime(Date, '%%m/%%d/%%y') AS DATE) AS Date,
+      GroupName,
+      TRY_CAST(IsEdVisit AS TINYINT) AS IsEdVisit,
+      TRY_CAST(IsHospitalAdmission AS TINYINT) AS IsHospitalAdmission,
+      TRY_CAST(IsInpatientAdmission AS TINYINT) AS IsInpatientAdmission,
+      TRY_CAST(IsOutpatientFaceToFaceVisit AS TINYINT) AS IsOutpatientFaceToFaceVisit,
+      SmokingStatus,
+      MyChartStatus,
+      OmbRace,
+      TRY_CAST(PatientBirthYearBin AS INTEGER) AS PatientBirthYearBin
+    FROM read_csv_auto('%s', header = true, all_varchar = true,
+                       nullstr = ['NA', ''], sample_size = 200000)
+  ", encounters_csv))
+
+  out <- dbGetQuery(con, sprintf("
+    SELECT * FROM enc
+    WHERE PatientDurableKey IN (
+      SELECT DISTINCT PatientDurableKey FROM enc WHERE GroupName IN (%s)
+    )
+  ", name_sql)) %>%
+    as_tibble() %>%
+    filter(!is.na(PatientDurableKey), !is.na(Date))
+
+  saveRDS(out, encounter_cache)
+  out
+}
+
+encounters <- load_encounters()
+
+encounters <- encounters %>%
+  mutate(
+    condition = case_when(
+      GroupName %in% c("Type 1 diabetes mellitus", "Type 2 diabetes mellitus") ~ "Diabetes",
+      GroupName == "Essential" ~ "Hypertension",
+      GroupName == "Heart failure" ~ "Heart failure",
+      GroupName == "Other chronic obstructive pulmonary disease" ~ "COPD",
+      GroupName == "Asthma" ~ "Asthma",
+      GroupName %in% c("Major depressive disorder, recurrent",
+                       "Major depressive disorder, single episode") ~ "Depression",
+      GroupName == "Chronic kidney disease" ~ "Chronic kidney disease",
+      TRUE ~ NA_character_
+    ),
+    is_high_acuity = as.integer(
+      IsEdVisit %in% 1 | IsHospitalAdmission %in% 1 | IsInpatientAdmission %in% 1
+    ),
+    is_outpatient = as.integer(IsOutpatientFaceToFaceVisit %in% 1)
+  )
+
+condition_counts <- encounters %>%
+  filter(!is.na(condition)) %>%
+  count(condition, name = "encounters") %>%
+  arrange(desc(encounters))
+
+knitr::kable(condition_counts, caption = "Chronic-condition encounters in the cohort")
+
+cat("Cohort patients:", n_distinct(encounters$PatientDurableKey), "\n")
+cat("Date range:", format(min(encounters$Date)), "to", format(max(encounters$Date)), "\n")
+```
+
+## Care transitions
+
+A care day is a day with either a face-to-face outpatient visit or an ED/hospital/inpatient encounter. Lab and imaging days are ignored so they do not reset the follow-up clock.
+
+```{r care-days}
+care_days <- encounters %>%
+  filter(is_high_acuity == 1 | is_outpatient == 1) %>%
+  group_by(PatientDurableKey, Date) %>%
+  summarise(
+    is_high_acuity = max(is_high_acuity),
+    is_outpatient = max(is_outpatient),
+    .groups = "drop"
+  )
+
+chronic_visits <- encounters %>%
+  filter(!is.na(condition), is_outpatient == 1) %>%
+  group_by(PatientDurableKey, Date) %>%
+  summarise(condition = first(sort(condition)), .groups = "drop") %>%
+  inner_join(
+    care_days %>% select(PatientDurableKey, Date, is_high_acuity),
+    by = c("PatientDurableKey", "Date")
+  ) %>%
+  filter(is_high_acuity == 0) %>%
+  select(-is_high_acuity)
+
+transitions <- chronic_visits %>%
+  rename(anchor_date = Date) %>%
+  left_join(
+    care_days %>%    # first care day strictly after the anchor
+      rename(next_date = Date) %>%
+      select(PatientDurableKey, next_date, is_high_acuity, is_outpatient),
+    by = join_by(PatientDurableKey, closest(anchor_date < next_date))
+  ) %>%
+  filter(!is.na(next_date)) %>%
+  mutate(
+    gap_days = as.numeric(next_date - anchor_date),
+    escalation = as.integer(is_high_acuity == 1)
+  ) %>%
+  select(-is_high_acuity, -is_outpatient)
+
+cat("Outpatient anchors:", nrow(chronic_visits), "\n")
+cat("Anchors with a later care contact:", nrow(transitions), "\n")
+cat("Escalations:", sum(transitions$escalation), "\n")
+cat("Escalation rate:", scales::percent(mean(transitions$escalation), accuracy = 0.1), "\n")
+```
+
+## Patient-level outcomes
+
+```{r patient-outcomes}
+patient_outcomes <- transitions %>%
+  group_by(PatientDurableKey) %>%
+  summarise(
+    ever_escalated = as.integer(any(escalation == 1)),
+    n_escalations = sum(escalation),
+    n_transitions = n(),
+    .groups = "drop"
+  )
+
+patient_conditions <- encounters %>%
+  filter(!is.na(condition)) %>%
+  group_by(PatientDurableKey) %>%
+  summarise(n_conditions = n_distinct(condition), .groups = "drop")
+
+last_value <- function(x) {
+  x <- x[!is.na(x)]
+  if (!length(x)) return(x[NA_integer_])
+  x[length(x)]
+}
+
+patient_demo <- encounters %>%
+  arrange(PatientDurableKey, Date, EncounterKey) %>%
+  group_by(PatientDurableKey) %>%
+  summarise(
+    SmokingStatus = last_value(SmokingStatus),
+    MyChartStatus = last_value(MyChartStatus),
+    OmbRace = last_value(OmbRace),
+    PatientBirthYearBin = last_value(PatientBirthYearBin),
+    .groups = "drop"
+  )
+
+ref_year <- as.integer(format(max(encounters$Date, na.rm = TRUE), "%Y"))
+
+analysis <- patient_outcomes %>%
+  inner_join(patient_demo, by = "PatientDurableKey") %>%
+  inner_join(patient_conditions, by = "PatientDurableKey") %>%
+  mutate(
+    approx_age = ref_year - (PatientBirthYearBin - 2.5),   # bin midpoint
+    age_group = cut(
+      approx_age,
+      breaks = c(-Inf, 40, 65, Inf),
+      labels = c("Under 40", "40-64", "65+"),
+      right = FALSE
+    ),
+    current_smoker = case_when(
+      SmokingStatus %in% c("Every Day", "Some Days", "Heavy Smoker",
+                           "Light Smoker", "Smoker, Current Status Unknown") ~ 1L,
+      SmokingStatus %in% c("Former", "Never",
+                           "Passive Smoke Exposure - Never Smoker") ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    mychart_activated = case_when(
+      MyChartStatus == "Activated" ~ 1L,
+      MyChartStatus %in% c("Pending Activation", "Inactivated", "Patient Declined",
+                           "Activation Code Generated, but Disabled") ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    is_minority = case_when(
+      OmbRace == "White" ~ 0L,
+      OmbRace %in% c("Unknown", "Asked but No Answer") ~ NA_integer_,
+      is.na(OmbRace) ~ NA_integer_,
+      TRUE ~ 1L
+    ),
+    visits_5 = n_transitions / 5
+  )
+```
+
+## Social risk
+
+Responses are collapsed to one row per patient using the most recent answer to each question, taking the worse answer when the same question was answered twice on the same day. Declined, unable to answer, and unknown responses are treated as missing.
+
+```{r sdoh}
+sdoh_raw <- local({
+  con <- dbConnect(duckdb::duckdb())
+  on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
+
+  dbGetQuery(con, sprintf("
+    SELECT
+      TRY_CAST(PatientDurableKey AS INTEGER) AS PatientDurableKey,
+      TRY_CAST(EncounterKey AS INTEGER) AS EncounterKey,
+      DisplayName,
+      AnswerText,
+      Domain
+    FROM read_csv_auto('%s', header = true, all_varchar = true,
+                       nullstr = ['NA', ''], sample_size = 200000)
+    WHERE lower(Domain) IN ('food insecurity', 'transportation needs', 'stress',
+                            'housing stability', 'depression', 'utilities')
+  ", sdoh_csv)) %>%
+    as_tibble()
+})
+
+sdoh_long <- sdoh_raw %>%
+  inner_join(encounters %>% distinct(EncounterKey, Date), by = "EncounterKey") %>%
+  mutate(
+    question = case_when(
+      str_detect(DisplayName, regex("food would run out", ignore_case = TRUE)) ~ "food_q1",
+      str_detect(DisplayName, regex("food you bought", ignore_case = TRUE)) ~ "food_q2",
+      str_detect(DisplayName, regex("medical appointments", ignore_case = TRUE)) ~ "transport",
+      str_detect(DisplayName, regex("pay for the very basics", ignore_case = TRUE)) ~ "fin_basics",
+      str_detect(DisplayName, regex("feel stress", ignore_case = TRUE)) ~ "stress",
+      str_detect(DisplayName, regex("homeless or living in a shelter", ignore_case = TRUE)) ~ "homeless",
+      DisplayName == "Edinburgh Depression Scale Total" ~ "edinburgh",
+      DisplayName == "PHQ-2 Total Score" ~ "phq2",
+      TRUE ~ NA_character_
+    ),
+    value = case_when(
+      question %in% c("food_q1", "food_q2") & AnswerText %in% c("Sometimes true", "Often true") ~ 1,
+      question %in% c("food_q1", "food_q2") & AnswerText == "Never true" ~ 0,
+      question == "transport" & AnswerText == "Yes" ~ 1,
+      question == "transport" & AnswerText == "No" ~ 0,
+      question == "fin_basics" & AnswerText %in% c("Somewhat hard", "Hard", "Very hard") ~ 1,
+      question == "fin_basics" & AnswerText %in% c("Not hard at all", "Not very hard") ~ 0,
+      question == "stress" & AnswerText %in% c("To some extent", "Rather much", "Very much") ~ 1,
+      question == "stress" & AnswerText %in% c("Not at all", "Only a little") ~ 0,
+      question == "homeless" & AnswerText == "Yes" ~ 1,
+      question == "homeless" & AnswerText == "No" ~ 0,
+      question %in% c("edinburgh", "phq2") ~ suppressWarnings(as.numeric(AnswerText)),
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  filter(!is.na(question), !is.na(value))
+
+sdoh_wide <- sdoh_long %>%
+  group_by(PatientDurableKey, question) %>%
+  filter(Date == max(Date)) %>%          # latest response only
+  summarise(value = max(value), .groups = "drop") %>%   # worst answer if repeated
+  pivot_wider(names_from = question, values_from = value)
+
+for (nm in c("food_q1", "food_q2", "transport", "fin_basics",
+             "stress", "homeless", "edinburgh", "phq2")) {
+  if (!nm %in% names(sdoh_wide)) sdoh_wide[[nm]] <- NA_real_
+}
+
+sdoh_patient <- sdoh_wide %>%
+  mutate(
+    food_insecure = if_else(
+      is.na(food_q1) & is.na(food_q2),
+      NA_integer_,
+      as.integer(pmax(food_q1, food_q2, na.rm = TRUE))
+    ),
+    transport_barrier = as.integer(transport),
+    financial_strain = as.integer(fin_basics),
+    stress_high = as.integer(stress),
+    housing_unstable = as.integer(homeless),
+    depression_positive = case_when(    # Edinburgh >= 10, PHQ-2 >= 3
+      !is.na(edinburgh) ~ as.integer(edinburgh >= 10),
+      !is.na(phq2) ~ as.integer(phq2 >= 3),
+      TRUE ~ NA_integer_
+    )
+  ) %>%
+  select(PatientDurableKey, food_insecure, transport_barrier, financial_strain,
+         stress_high, housing_unstable, depression_positive)
+
+analysis <- analysis %>%
+  left_join(sdoh_patient, by = "PatientDurableKey")
+```
+
+```{r coverage}
+coverage <- tibble(
+  variable = c("Smoking", "MyChart", "Race", "Age",
+               "Food insecurity", "Transportation", "Financial strain",
+               "Stress", "Housing", "Depression"),
+  non_missing = c(
+    sum(!is.na(analysis$current_smoker)),
+    sum(!is.na(analysis$mychart_activated)),
+    sum(!is.na(analysis$is_minority)),
+    sum(!is.na(analysis$age_group)),
+    sum(!is.na(analysis$food_insecure)),
+    sum(!is.na(analysis$transport_barrier)),
+    sum(!is.na(analysis$financial_strain)),
+    sum(!is.na(analysis$stress_high)),
+    sum(!is.na(analysis$housing_unstable)),
+    sum(!is.na(analysis$depression_positive))
+  )
+) %>%
+  mutate(percent = scales::percent(non_missing / nrow(analysis), accuracy = 0.1))
+
+knitr::kable(coverage, caption = "Non-missing values among patients with follow-up")
+
+cat("Patients with follow-up:", nrow(analysis), "\n")
+cat("Ever escalated:", sum(analysis$ever_escalated),
+    "(", scales::percent(mean(analysis$ever_escalated), accuracy = 0.1), ")\n")
+```
+
+Depression coverage is low (1.1%). Its adjusted estimate is reported for completeness, but it is imprecise.
+
+## Escalation by gap length
+
+```{r gap-plot}
+gap_escalation <- transitions %>%
+  mutate(
+    gap_bin = cut(
+      gap_days,
+      breaks = c(0, 30, 60, 90, 120, 180, 270, 365, Inf),
+      labels = c("1-30", "31-60", "61-90", "91-120",
+                 "121-180", "181-270", "271-365", "365+"),
+      right = TRUE
+    )
+  ) %>%
+  group_by(gap_bin) %>%
+  summarise(
+    n_transitions = n(),
+    n_escalations = sum(escalation),
+    escalation_rate = mean(escalation),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    se = sqrt(escalation_rate * (1 - escalation_rate) / n_transitions),
+    lo = pmax(0, escalation_rate - 1.96 * se),
+    hi = pmin(1, escalation_rate + 1.96 * se)
+  )
+
+knitr::kable(
+  gap_escalation %>%
+    transmute(
+      `Gap (days)` = gap_bin,
+      Transitions = scales::comma(n_transitions),
+      Escalations = scales::comma(n_escalations),
+      Rate = scales::percent(escalation_rate, accuracy = 0.1)
+    ),
+  caption = "Escalation rate by time to the next care contact"
+)
+
+p_gap <- ggplot(gap_escalation, aes(x = gap_bin, y = escalation_rate)) +
+  geom_col(fill = "#c0392b", width = 0.7) +
+  geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.2, linewidth = 0.6) +
+  geom_text(
+    aes(y = hi, label = scales::percent(escalation_rate, accuracy = 0.1)),
+    vjust = -0.5, size = 3.5, fontface = "bold"
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    breaks = seq(0, 0.10, by = 0.02),
+    expand = expansion(mult = c(0, 0.18))
+  ) +
+  labs(
+    title = "Escalation Peaks at Short and Very Long Gaps",
+    subtitle = "Next care contact after a chronic-condition outpatient visit",
+    x = "Days to next care contact",
+    y = "Escalation rate"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.major.x = element_blank()
+  )
+
+print(p_gap)
+ggsave(file.path(fig_dir, "escalation_by_gap_length.png"),
+       plot = p_gap, width = 10, height = 6, dpi = 300, bg = "white")
+ggsave(site_img("escalation-by-gap.png"),
+       plot = p_gap, width = 10, height = 6, dpi = 192, bg = "white")
+```
+
+The pattern is U-shaped, not monotonic. Escalation is highest within 30 days (5.8%) and after a year (8.1%), with a trough around 6-9 months (2.5-2.8%). Short gaps likely mix acute deterioration with routine follow-up; very long gaps are more consistent with disengagement. A single linear gap term would miss both ends.
+
+## Patient model
+
+The base model uses the full cohort. Social risk questions are asked on a subset of visits and tend to arrive in blocks, so a single complete-case model would drop most patients. Each SDOH variable is therefore added to the base model separately, using everyone who answered that question; the reported N varies by row. Visit count also doubles as observation time, so its odds ratio is descriptive rather than causal.
+
+```{r model}
+base_terms <- c(
+  "current_smoker", "mychart_activated", "is_minority",
+  "age_group", "n_conditions", "visits_5"
+)
+
+base_df <- analysis %>%
+  select(ever_escalated, all_of(base_terms)) %>%
+  drop_na() %>%
+  mutate(age_group = droplevels(age_group))
+
+usable_base <- base_terms[
+  vapply(base_df[base_terms], function(x) dplyr::n_distinct(x) > 1, logical(1))
+]
+
+base_model <- glm(
+  reformulate(usable_base, response = "ever_escalated"),
+  data = base_df,
+  family = binomial()
+)
+
+var_labels <- c(
+  current_smoker = "Current smoker",
+  mychart_activated = "MyChart activated",
+  is_minority = "Racial minority",
+  "age_group40-64" = "Age 40-64 (vs under 40)",
+  "age_group65+" = "Age 65+ (vs under 40)",
+  n_conditions = "Chronic conditions (count)",
+  visits_5 = "Outpatient visits (per 5)",
+  food_insecure = "Food insecure",
+  transport_barrier = "Transportation barrier",
+  financial_strain = "Financial strain",
+  stress_high = "High stress",
+  housing_unstable = "Unstable housing",
+  depression_positive = "Depression screen positive"
+)
+
+base_results <- tidy(
+  base_model,
+  conf.int = TRUE,
+  exponentiate = TRUE
+) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(model = "Base", n = nrow(base_df))
+
+sdoh_terms <- c(
+  "food_insecure", "transport_barrier", "financial_strain",
+  "stress_high", "housing_unstable", "depression_positive"
+)
+
+sdoh_results <- map_dfr(sdoh_terms, function(var) {
+  d <- analysis %>%
+    select(ever_escalated, all_of(usable_base), all_of(var)) %>%
+    drop_na()
+
+  if (nrow(d) < 500 || sum(d$ever_escalated) < 20 || n_distinct(d[[var]]) < 2) {
+    return(NULL)
+  }
+  if (min(table(d[[var]])) < 10) return(NULL)
+
+  fit <- glm(
+    reformulate(c(usable_base, var), response = "ever_escalated"),
+    data = d,
+    family = binomial()
+  )
+
+  tidy(fit, conf.int = TRUE, exponentiate = TRUE) %>%
+    filter(term == var) %>%
+    mutate(model = "Base + SDOH", n = nrow(d))
+})
+
+model_results <- bind_rows(base_results, sdoh_results) %>%
+  mutate(
+    label = unname(var_labels[term]),
+    label = if_else(is.na(label), term, label),
+    significant = if_else(p.value < 0.05, "Significant", "Not significant")
+  ) %>%
+  arrange(desc(estimate))
+
+knitr::kable(
+  model_results %>%
+    transmute(
+      Predictor = label,
+      OR = sprintf("%.2f", estimate),
+      `95% CI` = paste0(sprintf("%.2f", conf.low), " to ", sprintf("%.2f", conf.high)),
+      p = format.pval(p.value, digits = 3),
+      N = scales::comma(n)
+    ),
+  caption = "Patient-level predictors of ever escalating"
+)
+
+cat("Base model patients:", nrow(base_df), "\n")
+cat("Base model escalations:", sum(base_df$ever_escalated), "\n")
+cat("AIC:", round(AIC(base_model), 1), "\n")
+cat("McFadden R-squared:",
+    sprintf("%.3f", 1 - base_model$deviance / base_model$null.deviance), "\n")
+```
+
+## Forest plot
+
+```{r forest-plot}
+plot_results <- model_results %>%
+  filter(is.finite(conf.low), is.finite(conf.high), conf.low > 0) %>%
+  mutate(label = fct_reorder(label, estimate))
+
+p_forest <- ggplot(plot_results, aes(x = estimate, y = label)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high, color = significant),
+    orientation = "y", width = 0.25, linewidth = 0.8
+  ) +
+  geom_point(aes(color = significant), size = 3) +
+  scale_x_log10(breaks = c(0.25, 0.5, 1, 2, 4, 8)) +
+  scale_color_manual(
+    values = c("Significant" = "#c0392b", "Not significant" = "#bdc3c7")
+  ) +
+  labs(
+    title = "What Predicts Escalation to ED or Hospital?",
+    subtitle = "Odds ratios from the patient-level logistic model",
+    x = "Odds ratio (log scale)",
+    y = NULL,
+    color = NULL
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.major.y = element_blank()
+  )
+
+print(p_forest)
+ggsave(file.path(fig_dir, "escalation_odds_ratios.png"),
+       plot = p_forest, width = 10, height = 7, dpi = 300, bg = "white")
+ggsave(site_img("escalation-odds-ratios.png"),
+       plot = p_forest, width = 10, height = 7, dpi = 192, bg = "white")
+```
+
+## Compound risk
+
+Smoking is the fixed risk factor; the second is the SDOH variable with the largest adjusted OR among variables with at least 5,000 patients. The 2x2 is descriptive and does not include an interaction term.
+
+```{r compound-risk}
+binary_labels <- c(
+  current_smoker = "Current smoker",
+  mychart_activated = "MyChart activated",
+  is_minority = "Racial minority",
+  food_insecure = "Food insecure",
+  transport_barrier = "Transportation barrier",
+  financial_strain = "Financial strain",
+  stress_high = "High stress",
+  housing_unstable = "Unstable housing",
+  depression_positive = "Depression screen positive"
+)
+
+short_labels <- c(
+  current_smoker = "smoking",
+  mychart_activated = "MyChart activation",
+  is_minority = "racial minority",
+  food_insecure = "food insecurity",
+  transport_barrier = "transportation barriers",
+  financial_strain = "financial strain",
+  stress_high = "high stress",
+  housing_unstable = "unstable housing",
+  depression_positive = "depression"
+)
+
+sdoh_candidates <- sdoh_results %>%
+  filter(estimate > 1, n >= 5000) %>%
+  arrange(p.value) %>%
+  pull(term)
+
+v1 <- "current_smoker"
+v2 <- if (length(sdoh_candidates)) sdoh_candidates[1] else "is_minority"
+l1 <- binary_labels[[v1]]
+l2 <- binary_labels[[v2]]
+
+compound <- analysis %>%
+  filter(!is.na(.data[[v1]]), !is.na(.data[[v2]])) %>%
+  mutate(
+    risk_group = case_when(
+      .data[[v1]] == 0 & .data[[v2]] == 0 ~ "Neither",
+      .data[[v1]] == 1 & .data[[v2]] == 0 ~ paste(l1, "only"),
+      .data[[v1]] == 0 & .data[[v2]] == 1 ~ paste(l2, "only"),
+      .data[[v1]] == 1 & .data[[v2]] == 1 ~ "Both",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(risk_group)) %>%
+  group_by(risk_group) %>%
+  summarise(
+    n_patients = n(),
+    n_escalated = sum(ever_escalated),
+    escalation_rate = mean(ever_escalated),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    risk_group = factor(
+      risk_group,
+      levels = c("Neither", paste(l1, "only"), paste(l2, "only"), "Both")
+    )
+  )
+
+knitr::kable(
+  compound %>%
+    transmute(
+      Group = risk_group,
+      Patients = scales::comma(n_patients),
+      Escalated = scales::comma(n_escalated),
+      Rate = scales::percent(escalation_rate, accuracy = 0.1)
+    ),
+  caption = paste("Escalation by", short_labels[[v1]], "and", short_labels[[v2]])
+)
+
+p_compound <- ggplot(
+  compound,
+  aes(x = risk_group, y = escalation_rate, fill = risk_group)
+) +
+  geom_col(width = 0.7) +
+  geom_text(
+    aes(label = scales::percent(escalation_rate, accuracy = 0.1)),
+    vjust = -0.3, size = 3.8
+  ) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 14)) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = expansion(mult = c(0, 0.2))
+  ) +
+  scale_fill_manual(values = c(
+    "Neither" = "#2ecc71",
+    setNames("#f39c12", paste(l1, "only")),
+    setNames("#e67e22", paste(l2, "only")),
+    "Both" = "#c0392b"
+  )) +
+  labs(
+    title = str_to_sentence(paste("Escalation by", short_labels[[v1]],
+                                  "and", short_labels[[v2]])),
+    subtitle = "Observed rate; not adjusted for other factors",
+    x = NULL,
+    y = "Escalation rate",
+    caption = "Escalation = next care contact is ED, hospital, or inpatient admission"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(size = 10)
+  )
+
+print(p_compound)
+ggsave(file.path(fig_dir, "compound_risk_escalation.png"),
+       plot = p_compound, width = 9, height = 6, dpi = 300, bg = "white")
+ggsave(site_img("compound-risk.png"),
+       plot = p_compound, width = 9, height = 6, dpi = 192, bg = "white")
+```
+
+## Summary
+
+```{r summary}
+long_gap <- transitions %>%
+  mutate(gap_group = factor(
+    if_else(gap_days > 90, "> 90 days", "<= 90 days"),
+    levels = c("<= 90 days", "> 90 days")
+  )) %>%
+  group_by(gap_group) %>%
+  summarise(
+    n_transitions = n(),
+    n_escalations = sum(escalation),
+    escalation_rate = mean(escalation),
+    .groups = "drop"
+  )
+
+condition_table <- transitions %>%
+  group_by(condition) %>%
+  summarise(
+    n_transitions = n(),
+    n_escalations = sum(escalation),
+    escalation_rate = mean(escalation),
+    .groups = "drop"
+  ) %>%
+  filter(n_transitions >= 100) %>%
+  arrange(desc(escalation_rate))
+
+cat("Chronic-condition patients:", n_distinct(encounters$PatientDurableKey), "\n")
+cat("Patients with follow-up:", nrow(analysis), "\n")
+cat("Ever escalated:", sum(analysis$ever_escalated),
+    "(", scales::percent(mean(analysis$ever_escalated), accuracy = 0.1), ")\n\n")
+
+knitr::kable(
+  long_gap %>%
+    transmute(
+      `Gap group` = gap_group,
+      Transitions = scales::comma(n_transitions),
+      Escalations = scales::comma(n_escalations),
+      Rate = scales::percent(escalation_rate, accuracy = 0.1)
+    ),
+  caption = "Escalation before and after a 90-day gap"
+)
+
+knitr::kable(
+  condition_table %>%
+    transmute(
+      Condition = condition,
+      Transitions = scales::comma(n_transitions),
+      Escalations = scales::comma(n_escalations),
+      Rate = scales::percent(escalation_rate, accuracy = 0.1)
+    ),
+  caption = "Escalation by chronic condition (at least 100 transitions)"
+)
+```
+
+A single 90-day cut hides the U-shape: escalation is lower above 90 days overall, but the 365+ bin is the highest in the binned table. The threshold view is kept for continuity with the original pitch; the binned view is the better summary.
+
+## Definitions
+
+- Chronic conditions: the nine diagnosis groups listed above, collapsed into diabetes, hypertension, heart failure, COPD, asthma, depression, and chronic kidney disease.
+- Anchor: a face-to-face outpatient visit coded to a chronic condition.
+- Escalation: the next care contact after an anchor is an ED visit, hospital admission, or inpatient admission.
+- Gap: days from the anchor to that next care contact. Same-day contacts and lab/imaging-only days are excluded.
+- Social risk: most recent response per patient, worst answer if a question was answered twice on the same day; declined, unable to answer, and unknown responses are treated as missing.

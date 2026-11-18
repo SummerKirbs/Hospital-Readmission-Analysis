@@ -1,14 +1,17 @@
-# Private DataFest data — not published.
+# Private DataFest data - not published.
 /DATA/
 /data/
 
-# Original hackathon work — kept locally, not published.
+# Original hackathon work - kept locally, not published.
 /old_work/
 
 # Generated analysis artifacts.
 /cache/
 /figures/
-/*.rds
+/analysis/cache/
+/analysis/figures/
+/reports/*_files/
+*.rds
 
 # R / editor noise.
 .Rhistory

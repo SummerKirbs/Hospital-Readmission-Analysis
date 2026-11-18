@@ -1,5 +1,5 @@
 # Builds the patient-level tables used by the dashboard.
-# The encounter scan is cached; delete cache/dashboard_data.rds to rebuild.
+# The encounter scan is cached; delete analysis/cache/dashboard_data.rds to rebuild.
 
 suppressPackageStartupMessages({
   library(DBI)

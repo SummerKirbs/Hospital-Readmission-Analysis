@@ -38,13 +38,14 @@ The public dashboard is a static site built from the same R code in this reposit
 - [Data](#data)
 - [Methodology](#methodology)
 - [Results](#results)
+  - [Act I: Social burden and readmission](#act-i-social-burden-and-readmission)
+  - [Act II: Care-gap escalation](#act-ii-care-gap-escalation)
 - [Project Structure](#project-structure)
 - [Reproducing the Analysis](#reproducing-the-analysis)
 - [Dashboard](#dashboard)
 - [Limitations](#limitations)
 - [License](#license)
 - [Important Links](#important-links)
-- [Team](#team)
 
 ## Overview
 
@@ -53,7 +54,7 @@ Two linked questions drive the project:
 1. **Does social burden compound hospital use?** Patients with more social barriers have more inpatient admissions and less timely follow-up. The relationship is not a simple step: follow-up peaks in the middle of the score and then falls sharply for the highest-burden patients.
 2. **What happens when chronic-care follow-up stops?** After a chronic-condition outpatient visit, the next care contact is sometimes an ED visit or hospital admission. Escalation risk is U-shaped: highest in the first month, lowest around 6–9 months, and highest again after a year.
 
-The dashboard tells both stories with eight charts, short captions, and the definitions needed to read them.
+The eight charts below tell both stories, with short takeaway-first captions and the definitions needed to read them.
 
 ## Data
 
@@ -79,17 +80,15 @@ The data includes encounter dates from 2022 through 2025, inpatient and outpatie
 
 The score adds one point per positive domain across nine SDOH domains. A patient enters the score only if they answered at least one domain; missing domains add zero, so the score is a lower bound on burden.
 
-| Domain | Positive threshold |
-|---|---|
-| Food insecurity | “Sometimes true” or “Often true” on either food question |
-| Transportation | “Yes” to either transportation question |
-| Housing instability | Homeless, no steady place to sleep in the past year, or 3+ moves |
-| Financial strain | Paying for basics is somewhat hard, hard, or very hard, or unable to pay rent on time |
-| Utility shut-off risk | Threatened shut-off or already shut off |
-| High stress | “Rather much” or “Very much” |
-| Depression | Edinburgh score ≥ 10 or PHQ-2 score ≥ 3 |
-| Heavy alcohol use | Drinking 2–3 times a week or more, or weekly binge drinking |
-| Physical inactivity | Zero days of moderate exercise per week |
+- **Food insecurity:** “Sometimes true” or “Often true” on either food question.
+- **Transportation:** “Yes” to either transportation question.
+- **Housing instability:** Homeless, no steady place to sleep in the past year, or 3+ moves.
+- **Financial strain:** Paying for basics is somewhat hard, hard, or very hard, or unable to pay rent on time.
+- **Utility shut-off risk:** Threatened shut-off or already shut off.
+- **High stress:** “Rather much” or “Very much.”
+- **Depression:** Edinburgh score ≥ 10 or PHQ-2 score ≥ 3.
+- **Heavy alcohol use:** Drinking 2–3 times a week or more, or weekly binge drinking.
+- **Physical inactivity:** Zero days of moderate exercise per week.
 
 ### Readmission and follow-up
 
@@ -111,94 +110,49 @@ A logistic regression estimates the odds of ever escalating, adjusting for smoki
 
 ## Results
 
-### Social burden and readmission
+### Act I: Social burden and readmission
 
-| Metric | Value |
-|---|---|
-| Patients with a usable SDOH survey | 70,791 |
-| Average inpatient admissions per patient | 0.59 |
-| Outpatient follow-up within 90 days | 60% |
-| Patients with 6+ inpatient admissions | 1.8% |
-| Average admissions, score 0 → score 7 | 0.40 → 3.39 |
-| Relative rise across the score | ~8.5× |
-| Follow-up, score 0 → score 7 | 58% → 41% |
-| Follow-up gap at score 7 | −16 percentage points |
+Across 70,791 patients with a usable SDOH survey, the average patient had 0.59 inpatient admissions, 60% returned for outpatient follow-up within 90 days, and 1.8% had 6+ admissions.
 
-The score gradient is strongest at the top: score 0 has 31,953 patients, while score 7 has 335. The final follow-up drop should therefore be read as directional.
+![Prevalence of each social burden domain](assets/img/domain-prevalence.png)
 
-### Readmission frequency
+**01 · Stress and inactivity are the most common barriers. Housing and utility risk are the rarest.** Each bar is the share of patients screened for that domain who screen positive. Every domain has its own denominator and defined threshold, so read each bar within its own screened group. High stress reaches 38.7%, physical inactivity 34.5%, and housing instability 4.0%.
 
-| Factor | 1–2 admissions | 6+ admissions | Change |
-|---|---:|---:|---:|
-| No risk factors | 75.14% | 57.32% | −17.8 pp |
-| Financial strain | 16.95% | 31.61% | +14.7 pp |
-| Transportation barrier | 6.82% | 25.16% | +18.3 pp |
-| Heavy smoker | 14.15% | 18.11% | +4.0 pp |
-| Light smoker | 2.74% | 3.62% | +0.9 pp |
-| Former smoker | 26.17% | 44.74% | +18.6 pp |
-| Never smoker | 56.94% | 33.53% | −23.4 pp |
+![Average inpatient admissions by Social Burden Score](assets/img/admissions-by-score.png)
 
-The no-risk share falls while social barriers rise. The average rise across financial strain and transportation barriers is about **16.5 percentage points**, compared with a **17.8-point** drop for patients with no risk factors.
+**02 · Every additional barrier travels with more inpatient use.** Points are the average number of distinct inpatient stays per patient in each score group. The line rises from 0.40 at score 0 to 3.39 at score 7, roughly an 8.5× increase.
 
-### Care-gap escalation
+![90-day follow-up by Social Burden Score](assets/img/followup-by-score.png)
 
-| Metric | Value |
-|---|---|
-| Chronic-condition patients | 90,836 |
-| Outpatient anchors | 279,749 |
-| Anchors with a later care contact | 262,585 |
-| Escalations | 13,014 |
-| Escalation rate per transition | 5.0% |
-| Patients ever escalating | 14.6% |
-| Base model patients | 62,014 |
+**03 · Follow-up peaks in the middle, then falls sharply for the highest-burden patients.** The chart shows the share of patients with a face-to-face outpatient visit within 90 days of their first outpatient visit. Follow-up rises to 65% at score 4, then drops to 41% at score 7, a 16-point gap versus score 0. The score-7 group is small (n=335), so treat the final drop as directional.
 
-Escalation by time to the next care contact:
+![Social barriers by readmission band](assets/img/sdoh-by-readmission.png)
 
-| Gap (days) | Transitions | Escalations | Rate |
-|---|---:|---:|---:|
-| 1–30 | 128,103 | 7,454 | 5.8% |
-| 31–60 | 45,105 | 2,212 | 4.9% |
-| 61–90 | 24,767 | 1,099 | 4.4% |
-| 91–120 | 23,065 | 643 | 2.8% |
-| 121–180 | 17,898 | 730 | 4.1% |
-| 181–270 | 16,473 | 417 | 2.5% |
-| 271–365 | 3,461 | 159 | 4.6% |
-| 365+ | 3,713 | 300 | 8.1% |
+**04 · The no-risk share falls as readmissions rise. Financial and transportation barriers rise.** Each panel shows the share of screened patients with that factor within each admission band, and panels use different y-axis scales. From 1–2 to 6+ admissions, the no-risk share falls 17.8 points, while financial strain and transportation barriers rise by 14.7 and 18.3 points.
 
-The pattern is U-shaped, not monotonic. A single 90-day cut would miss both the early spike and the late rise.
+![Smoking status by readmission band](assets/img/smoking-by-readmission.png)
 
-Strongest adjusted predictors of ever escalating:
+**05 · Never-smokers fall from 56.9% to 33.5% as admissions rise. Former smokers rise from 26.2% to 44.7%.** Each panel shows the share of patients in a smoking group within each admission band, excluding unknown smoking status. Heavy and light smokers also grow, but from a smaller base.
 
-| Predictor | OR | 95% CI | N |
-|---|---:|---|---:|
-| Unstable housing | 2.76 | 2.01–3.80 | 13,314 |
-| Transportation barrier | 2.09 | 1.75–2.49 | 18,682 |
-| Outpatient visits (per 5) | 1.76 | 1.72–1.81 | 62,014 |
-| Current smoker | 1.51 | 1.42–1.62 | 62,014 |
-| Chronic conditions (count) | 1.49 | 1.45–1.54 | 62,014 |
-| Racial minority | 1.44 | 1.36–1.53 | 62,014 |
-| Food insecure | 1.29 | 1.13–1.48 | 18,474 |
-| Financial strain | 1.23 | 1.09–1.38 | 16,020 |
-| High stress | 1.03 | 0.94–1.12 | 18,144 |
-| Depression screen positive | 0.80 | 0.50–1.26 | 767 |
-| MyChart activated | 0.69 | 0.64–0.73 | 62,014 |
-| Age 40–64 (vs under 40) | 0.67 | 0.61–0.72 | 62,014 |
-| Age 65+ (vs under 40) | 0.63 | 0.58–0.68 | 62,014 |
+### Act II: Care-gap escalation
 
-Smoking and transportation barriers compound:
+The second analysis follows 90,836 chronic-condition patients through 262,585 outpatient-to-next-contact transitions. Escalation means the next contact is an ED visit, hospital admission, or inpatient stay, not another routine visit. The escalation rate is 5.0% per transition, and 14.6% of patients ever escalate.
 
-| Group | Patients | Escalated | Rate |
-|---|---:|---:|---:|
-| Neither | 16,070 | 3,318 | 20.6% |
-| Current smoker only | 2,055 | 559 | 27.2% |
-| Transportation barrier only | 457 | 177 | 38.7% |
-| Both | 198 | 85 | 42.9% |
+![Escalation rate by time to the next care contact](assets/img/escalation-by-gap.png)
 
-The “both” group is small (n=198), so treat the exact gap as directional; the ordering is the useful signal.
+**06 · Escalation is U-shaped: highest in the first month and after a year.** Each bar is the share of outpatient chronic-care anchors whose next care contact is an ED visit, hospital admission, or inpatient stay. Bars show 95% confidence intervals. Short gaps likely mix acute deterioration with routine follow-up; very long gaps are more consistent with disengagement. The rate is 5.8% at 1–30 days, falls to 2.5–2.8% around 6–9 months, then rises to 8.1% past a year.
+
+![Adjusted odds ratios for ever escalating](assets/img/escalation-odds-ratios.png)
+
+**07 · Housing instability and transportation barriers are the strongest adjusted signals.** Odds ratios come from a patient-level logistic model. Values above 1 mean higher odds of ever escalating; values below 1 mean lower odds. Each social factor is added separately, so N varies by row. Unstable housing (OR 2.76), transportation barriers (2.09), and outpatient visit count (1.76 per 5 visits) lead the model, while MyChart activation (0.69) and older age (0.63–0.67) are associated with lower odds.
+
+![Escalation by smoking and transportation barriers](assets/img/compound-risk.png)
+
+**08 · Risks compound: smoking plus a transportation barrier reaches 42.9% escalation.** These are observed escalation rates for four groups, not adjusted for other factors. The "both" group is small (n=198), so treat the exact gap as directional; the ordering is the useful signal. Rates are 20.6% for neither factor, 27.2% for smoking only, 38.7% for a transportation barrier only, and 42.9% for both.
 
 ### Two escalation rates
 
-**5.0%** is the share of transitions that escalate; **14.6%** is the share of patients who ever escalate. They answer different questions.
+**5.0%** is the share of transitions that escalate; **14.6%** is the share of patients who ever escalate. They answer different questions. Use the first for the system view and the second for the patient view.
 
 ## Project Structure
 
@@ -208,12 +162,14 @@ The “both” group is small (n=198), so treat the exact gap as directional; th
 ├── assets/
 │   ├── css/style.css              # dashboard styling
 │   └── img/*.png                  # charts written by the R analysis
-├── social_burden_dashboard.Rmd    # Act I: social burden and readmission
-├── social_burden_dashboard.html   # rendered flexdashboard (generated)
-├── dashboard_data.R               # cohort and SDOH table builder
-├── dashboard.css                  # flexdashboard styling
-├── agentic_datafest_patients.Rmd  # Act II: care-gap escalation
-├── agentic_datafest_patients.pdf  # rendered analysis report (generated)
+├── analysis/
+│   ├── social_burden_dashboard.Rmd    # Act I: social burden and readmission
+│   ├── agentic_datafest_patients.Rmd  # Act II: care-gap escalation
+│   ├── dashboard_data.R               # cohort and SDOH table builder
+│   └── dashboard.css                  # flexdashboard styling
+├── reports/
+│   ├── social_burden_dashboard.html   # rendered flexdashboard (generated)
+│   └── agentic_datafest_patients.pdf  # rendered analysis report (generated)
 ├── scripts/
 │   └── rebuild_site_figures.R     # rebuild all dashboard PNGs
 ├── .gitignore
@@ -222,7 +178,7 @@ The “both” group is small (n=198), so treat the exact gap as directional; th
 └── README.md
 ```
 
-`social_burden_dashboard.html` and `agentic_datafest_patients.pdf` are generated artifacts kept for reference. The source of truth is the R Markdown and R code.
+The files in `reports/` are generated artifacts kept for reference. The source of truth is the R Markdown and R code in `analysis/`.
 
 ## Reproducing the Analysis
 
@@ -247,16 +203,16 @@ Place the private CSVs in `DATA/`, then run from the repository root:
 Rscript scripts/rebuild_site_figures.R
 ```
 
-This renders both R Markdown reports and writes the eight dashboard PNGs to `assets/img/`.
+This renders both R Markdown reports into `reports/` and writes the eight dashboard PNGs to `assets/img/`.
 
 Individual reports can also be rendered directly:
 
 ```bash
-Rscript -e 'rmarkdown::render("social_burden_dashboard.Rmd")'
-Rscript -e 'rmarkdown::render("agentic_datafest_patients.Rmd")'
+Rscript -e 'rmarkdown::render("analysis/social_burden_dashboard.Rmd", output_file = "reports/social_burden_dashboard.html")'
+Rscript -e 'rmarkdown::render("analysis/agentic_datafest_patients.Rmd", output_file = "reports/agentic_datafest_patients.pdf")'
 ```
 
-The first render scans the encounter file once and caches the result in `cache/`. Delete `cache/dashboard_data.rds` to force a rebuild. Generated `cache/` and `figures/` folders are ignored by git.
+The first render scans the encounter file once and caches the result in `analysis/cache/`. Delete `analysis/cache/dashboard_data.rds` to force a rebuild. Generated `analysis/cache/` and `analysis/figures/` folders are ignored by git.
 
 ## Dashboard
 
@@ -268,16 +224,9 @@ It is plain HTML and CSS with one small progressive-enhancement script for the a
 
 Every chart is reproducible from code:
 
-| Dashboard image | Code | What it shows |
-|---|---|---|
-| `domain-prevalence.png` | `social_burden_dashboard.Rmd` | Prevalence of each SDOH domain |
-| `admissions-by-score.png` | `social_burden_dashboard.Rmd` | Admissions by Social Burden Score |
-| `followup-by-score.png` | `social_burden_dashboard.Rmd` | 90-day follow-up by score |
-| `sdoh-by-readmission.png` | `social_burden_dashboard.Rmd` | SDOH by readmission band |
-| `smoking-by-readmission.png` | `social_burden_dashboard.Rmd` | Smoking status by readmission band |
-| `escalation-by-gap.png` | `agentic_datafest_patients.Rmd` | Escalation by care-gap length |
-| `escalation-odds-ratios.png` | `agentic_datafest_patients.Rmd` | Adjusted odds ratios |
-| `compound-risk.png` | `agentic_datafest_patients.Rmd` | Smoking + transportation risk |
+- `analysis/social_burden_dashboard.Rmd` writes `domain-prevalence.png`, `admissions-by-score.png`, `followup-by-score.png`, `sdoh-by-readmission.png`, and `smoking-by-readmission.png`.
+- `analysis/agentic_datafest_patients.Rmd` writes `escalation-by-gap.png`, `escalation-odds-ratios.png`, and `compound-risk.png`.
+- `scripts/rebuild_site_figures.R` rebuilds all eight charts and both reports in one step.
 
 ## Limitations
 
@@ -295,11 +244,5 @@ This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE
 
 - **Live Dashboard:** [summerkirbs.github.io/Hospital-Readmission-Analysis](https://summerkirbs.github.io/Hospital-Readmission-Analysis/)
 - **Repository:** [SummerKirbs/Hospital-Readmission-Analysis](https://github.com/SummerKirbs/Hospital-Readmission-Analysis)
-- **Full escalation report:** [agentic_datafest_patients.pdf](agentic_datafest_patients.pdf)
-- **Rendered social-burden dashboard:** [social_burden_dashboard.html](social_burden_dashboard.html)
-
-## Team
-
-**Team Databased**, DataFest 2026
-
-Angela Huang, Euleena Trinh, Kaelynn Cadiz, Nathan Truong, Will Prawira
+- **Full escalation report:** [reports/agentic_datafest_patients.pdf](reports/agentic_datafest_patients.pdf)
+- **Rendered social-burden dashboard:** [reports/social_burden_dashboard.html](reports/social_burden_dashboard.html)

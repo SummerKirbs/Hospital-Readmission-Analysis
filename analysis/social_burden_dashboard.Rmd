@@ -30,6 +30,7 @@ doc_dir <- tryCatch({
   if (is.null(input)) getwd() else dirname(input)
 }, error = function(e) getwd())
 doc_dir <- normalizePath(doc_dir, winslash = "/", mustWork = TRUE)
+repo_dir <- normalizePath(file.path(doc_dir, ".."), winslash = "/", mustWork = TRUE)
 
 source(file.path(doc_dir, "dashboard_data.R"))
 dash <- load_dashboard_data(doc_dir)
@@ -37,8 +38,8 @@ patients <- dash$patients
 
 # Save each chart for the static GitHub Pages site.
 site_img <- function(name) {
-  dir.create(file.path(doc_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
-  file.path(doc_dir, "assets", "img", name)
+  dir.create(file.path(repo_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
+  file.path(repo_dir, "assets", "img", name)
 }
 
 sbs <- patients %>%
@@ -185,7 +186,7 @@ Overview
 ###
 
 <div class="hero">
-  <div class="hero-kicker">DataFest 2026 · Team Databased</div>
+  <div class="hero-kicker">DataFest 2026</div>
   <h2>Social burden compounds the risk of hospital escalation</h2>
   <p>This dashboard rebuilds the five visuals from the presentation on the same encounter and social-determinants data. It follows patients from routine outpatient care into readmission, and asks which social barriers travel with the highest utilization.</p>
 </div>
@@ -423,7 +424,7 @@ Definitions
 
 <div class="note-block">
 <h4>Sources</h4>
-<p>Encounters: <code>encounters.csv</code>. Questionnaires: <code>social_determinants.csv</code>. Demographics and smoking status: <code>patients.csv</code>. The encounter scan is cached in <code>cache/dashboard_data.rds</code>; the first render takes a few minutes, later renders are fast.</p>
+<p>Encounters: <code>encounters.csv</code>. Questionnaires: <code>social_determinants.csv</code>. Demographics and smoking status: <code>patients.csv</code>. The encounter scan is cached in <code>analysis/cache/dashboard_data.rds</code>; the first render takes a few minutes, later renders are fast.</p>
 </div>
 
 </div>

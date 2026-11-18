@@ -37,6 +37,7 @@ doc_dir <- tryCatch({
   if (is.null(input)) getwd() else dirname(input)
 }, error = function(e) getwd())
 doc_dir <- normalizePath(doc_dir, winslash = "/", mustWork = TRUE)
+repo_dir <- normalizePath(file.path(doc_dir, ".."), winslash = "/", mustWork = TRUE)
 
 find_data <- function(filename) {
   candidates <- c(
@@ -59,8 +60,8 @@ dir.create(fig_dir, showWarnings = FALSE)
 
 # Copy chart output into the static site folder.
 site_img <- function(name) {
-  dir.create(file.path(doc_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
-  file.path(doc_dir, "assets", "img", name)
+  dir.create(file.path(repo_dir, "assets", "img"), showWarnings = FALSE, recursive = TRUE)
+  file.path(repo_dir, "assets", "img", name)
 }
 ```
 
